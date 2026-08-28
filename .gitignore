@@ -1,0 +1,15 @@
+node_modules/
+.env
+.env.local
+__pycache__/
+*.pyc
+.venv/
+venv/
+dist/
+build/
+*.pkl
+!ml/models/.gitkeep
+.DS_Store
+*.log
+coverage/
+.pytest_cache/
