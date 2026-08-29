@@ -21,7 +21,7 @@ An AI-powered food waste prevention system for restaurants, cafeterias, hotels, 
 - [x] **Phase 1** — Environment Setup
 - [x] **Phase 2** — Data Model & API Contract Design
 - [x] **Phase 3** — Dataset Preparation
-- [ ] **Phase 4** — Backend Core (Auth, Org, Inventory)
+- [x] **Phase 4** — Backend Core (Auth, Org, Inventory)
 - [ ] **Phase 5** — ML Model Development
 - [ ] **Phase 6** — FastAPI Serving Layer
 - [ ] **Phase 7** — Frontend: Operations Module
@@ -39,12 +39,11 @@ An AI-powered food waste prevention system for restaurants, cafeterias, hotels, 
 | Layer | Technology |
 |---|---|
 | Frontend | React + TypeScript, Recharts |
-| Backend | Node.js + Express, Mongoose |
+| Backend | Node.js + Express, Mongoose, JWT, bcrypt, Zod |
 | Database | MongoDB (Atlas free tier) |
 | AI Service | Python + FastAPI |
 | ML | Scikit-learn, XGBoost, Pandas, Jupyter |
-| Auth | JWT |
-| Validation | Zod (backend), Pydantic (AI service) |
+| Testing | Jest + Supertest (backend), Pytest (AI service) |
 
 See `docs/api-contract.md` for the frozen API contract (schemas + endpoints, finalized in Phase 2).
 
@@ -55,45 +54,49 @@ See `docs/api-contract.md` for the frozen API contract (schemas + endpoints, fin
 ```
 qulin-organization/
 ├── backend/
+│   ├── jest.config.js
 │   ├── scripts/
-│   │   └── seed-db.js           # synthetic data seeder — Member 1
+│   │   └── seed-db.js               # synthetic data seeder — Member 1
 │   ├── src/
-│   │   ├── config/                # db connection, env loader
-│   │   ├── models/                 # Organization, Branch, Ingredient,
-│   │   │                           #   Production, Consumption, Waste
-│   │   ├── routes/                 # (added Phase 4+)
-│   │   ├── controllers/            # (added Phase 4+)
-│   │   ├── middleware/             # errorHandler.js
-│   │   ├── validators/             # (added Phase 4+)
-│   │   ├── services/                # (added Phase 6 — aiClient.js)
+│   │   ├── config/                   # db connection, env loader
+│   │   ├── models/                    # Organization, Branch, User, Ingredient,
+│   │   │                              #   Production, Consumption, Waste
+│   │   ├── routes/                    # auth.routes.js, inventory.routes.js
+│   │   ├── controllers/               # auth.controller.js, inventory.controller.js
+│   │   ├── middleware/                # auth.js (JWT verify), errorHandler.js
+│   │   ├── validators/                # auth.validator.js, inventory.validator.js (Zod)
+│   │   ├── utils/                      # AppError.js, asyncHandler.js
+│   │   ├── services/                   # (added Phase 6 — aiClient.js)
 │   │   ├── app.js
 │   │   └── server.js
 │   ├── tests/
+│   │   ├── auth.test.js
+│   │   └── inventory.test.js
 │   ├── package.json
 │   └── .env.example
 │
-├── ai-service/                     # Python/FastAPI AI microservice — Member 2
+├── ai-service/                        # Python/FastAPI AI microservice — Member 2
 │   ├── app/
 │   │   ├── main.py
-│   │   ├── routers/                 # (added Phase 6)
-│   │   ├── schemas/                  # (added Phase 6)
-│   │   ├── services/                  # (added Phase 6)
-│   │   └── rootcause/                  # (added Phase 6)
+│   │   ├── routers/                    # (added Phase 6)
+│   │   ├── schemas/                     # (added Phase 6)
+│   │   ├── services/                     # (added Phase 6)
+│   │   └── rootcause/                     # (added Phase 6)
 │   ├── tests/
 │   ├── requirements.txt
 │   └── .env.example
 │
-├── ml/                              # Training pipeline (offline) — Member 2
+├── ml/                                 # Training pipeline (offline) — Member 2
 │   ├── data/
-│   │   ├── generate_sample_data.py    # exports MongoDB → dataset.csv
+│   │   ├── generate_sample_data.py        # exports MongoDB → dataset.csv
 │   │   └── processed/
-│   │       └── dataset.csv             # flattened synthetic dataset (150 days)
+│   │       └── dataset.csv                 # flattened synthetic dataset (150 days)
 │   ├── notebooks/
-│   │   └── eda.ipynb                   # seasonality + waste correlation analysis
-│   ├── preprocessing/                  # (added Phase 5)
-│   ├── training/                       # (added Phase 5)
-│   ├── evaluation/                     # (added Phase 5)
-│   └── models/                         # trained .pkl files (added Phase 5)
+│   │   └── eda.ipynb                        # seasonality + waste correlation analysis
+│   ├── preprocessing/                       # (added Phase 5)
+│   ├── training/                            # (added Phase 5)
+│   ├── evaluation/                          # (added Phase 5)
+│   └── models/                              # trained .pkl files (added Phase 5)
 │
 ├── frontend/            # React app (added Phase 7-8) — shared, split by module
 ├── docs/
@@ -112,8 +115,9 @@ qulin-organization/
 - Python 3.11+
 - Git (Git Bash recommended on Windows for shell command compatibility)
 - A MongoDB Atlas free-tier cluster (or local MongoDB instance)
+- [Postman](https://www.postman.com/) (recommended for manual API testing)
 
-> **Windows DNS note:** if MongoDB connections fail with `ECONNREFUSED` / `querySrv` errors, your network's default DNS resolver may not support the SRV record lookups Atlas's `mongodb+srv://` format relies on. Fix: set your network adapter's DNS to `8.8.8.8` / `8.8.4.4` (Google DNS), then `ipconfig /flushdns` and retry. Hit and resolved during Phase 3 — ask a team member if it recurs.
+> **Windows DNS note:** if MongoDB connections fail with `ECONNREFUSED` / `querySrv` errors, your network's default DNS resolver may not support the SRV record lookups Atlas's `mongodb+srv://` format relies on. Fix: set your network adapter's DNS to `8.8.8.8` / `8.8.4.4` (Google DNS), then `ipconfig /flushdns` and retry.
 
 ### 1. Clone the repository
 
@@ -131,7 +135,7 @@ npm install
 cp .env.example .env
 ```
 
-Edit `backend/.env` with your own values:
+Edit `backend/.env`:
 
 ```
 PORT=5000
@@ -156,21 +160,20 @@ curl localhost:5000/health
 # Expected: {"status":"ok","service":"qulin-backend"}
 ```
 
-### 3. Seed the database (synthetic demo data)
+Run the automated test suite:
 
-Generates ~150 days of realistic Production/Consumption/Waste records for one demo Organization/Branch, including the Friday-rice overproduction pattern used as the Phase 9/18 acceptance test scenario.
+```bash
+npm run test
+```
+
+### 3. Seed the database (synthetic demo data)
 
 ```bash
 # from backend/
 npm run seed
 ```
 
-Expected output ends with:
-```
-✅ Seed complete.
-...
-Reproduced pattern: Rice / Friday / Lunch → preparedQty=500 constant, consumedQty varies (~430 avg), high overproduction waste.
-```
+Generates ~150 days of realistic Production/Consumption/Waste records, including the Friday-rice overproduction pattern used as the Phase 9/18 acceptance test scenario.
 
 ### 4. AI service setup (`ai-service/`)
 
@@ -206,21 +209,45 @@ curl localhost:8000/health
 # Expected: {"status":"ok","service":"qulin-ai-service"}
 ```
 
-> **Important:** `AI_SERVICE_KEY` must be identical in both `backend/.env` and `ai-service/.env`. This is the shared internal secret the backend uses to authenticate calls to the AI service (used starting Phase 6). It is never committed to git — share it directly between team members.
-
 ### 5. Export dataset + run EDA (`ml/`)
-
-Requires the database to be seeded first (Step 3).
 
 ```bash
 # from repo root, with ai-service/.venv activated
 python ml/data/generate_sample_data.py
 ```
 
-Produces `ml/data/processed/dataset.csv` — one row per `(item, meal, date)` with columns:
-`date, day_of_week, item, meal, prepared_qty, consumed_qty, waste_qty, waste_reason, stock_level, days_to_expiry, customer_count`
+Open `ml/notebooks/eda.ipynb` in VS Code (select the `ai-service/.venv` kernel) for seasonality and waste-correlation analysis.
 
-Open `ml/notebooks/eda.ipynb` in VS Code (select the `ai-service/.venv` kernel) to view day-of-week seasonality and prepared/waste correlation analysis.
+---
+
+## API Endpoints (live as of Phase 4)
+
+All under `http://localhost:5000/api/v1`. Full contract in `docs/api-contract.md`.
+
+| Endpoint | Method | Auth | Notes |
+|---|---|---|---|
+| `/auth/register` | POST | No | Creates Organization + default Branch + admin User |
+| `/auth/login` | POST | No | Returns JWT |
+| `/inventory` | GET | JWT | Org-scoped list |
+| `/inventory` | POST | JWT | Create ingredient |
+| `/inventory/:id` | PUT | JWT | Update ingredient |
+| `/inventory/:id` | DELETE | JWT | Delete ingredient |
+
+### Testing the API manually
+
+A Postman collection (`QULIN_API`) is the recommended way to exercise these endpoints during development:
+
+1. Create a collection with variable `baseUrl` = `http://localhost:5000/api/v1`
+2. On the `register` and `login` requests, add this to **Scripts → Post-response** so the JWT auto-saves for reuse:
+   ```javascript
+   const data = pm.response.json();
+   if (data.token) {
+     pm.collectionVariables.set("token", data.token);
+   }
+   ```
+3. On authenticated requests (inventory), set header `Authorization: Bearer {{token}}`
+
+`curl` equivalents are also documented inline in each controller's PR description for quick smoke-testing without Postman.
 
 ---
 
@@ -234,15 +261,15 @@ main            (protected — deploy-ready only)
        └── integration/phase-N   (short-lived, joint work — Phases 9-10)
 ```
 
-- All work happens on `feature/<m1|m2>-<short-desc>` branches, branched from `develop`.
+- Work happens on `feature/<m1|m2>-<short-desc>` branches, branched from `develop`.
 - PRs target `develop`, require 1 approval from the other member, and must state which phase/issue they close.
 - `develop → main` only at the end of a fully integration-tested phase, via its own reviewed PR.
 - Commit convention: [Conventional Commits](https://www.conventionalcommits.org/) — `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`.
-- Never edit the other member's owned files/folders (see Ownership Boundaries below). The only shared files (`docs/api-contract.md`, `frontend/src/shared/*`) follow an additive-only rule — structural changes go through their own small, fast-reviewed PR.
+- Never edit the other member's owned files/folders (see Ownership Boundaries below). Shared files (`docs/api-contract.md`, `frontend/src/shared/*`) follow an additive-only rule.
 
 ---
 
-## Ownership Boundaries (do not cross without a PR + review)
+## Ownership Boundaries
 
 | Folder | Owner |
 |---|---|
@@ -259,17 +286,22 @@ main            (protected — deploy-ready only)
 
 ## Data Model
 
-Six MongoDB collections currently defined (`backend/src/models/`), matching the frozen contract in `docs/api-contract.md`:
+Seven MongoDB collections implemented (`backend/src/models/`), matching `docs/api-contract.md`:
 
-`Organization → Branch → Ingredient / Production / Consumption / Waste`
+`Organization → Branch → User / Ingredient / Production / Consumption / Waste`
 
-Three more collections (`User`, `Recommendation`, `Outcome`) are documented in the contract and will be implemented in Phase 4 and Phase 9 respectively.
+Two more (`Recommendation`, `Outcome`) are documented in the contract and will be implemented in Phase 9.
+
+**Auth notes:**
+- Registration creates an Organization, a default "Main Branch," and an admin User in one step.
+- Passwords hashed with bcrypt (`passwordHash` field has `select: false` — never returned in queries unless explicitly requested).
+- JWT payload: `{ id, orgId, branchId, role }`, used to scope every subsequent query to the correct organization (multi-tenant isolation).
 
 ---
 
 ## Documentation
 
-- `docs/api-contract.md` — frozen API contract between frontend/backend/AI service (Phase 2)
+- `docs/api-contract.md` — frozen API contract (Phase 2)
 - `ml/notebooks/eda.ipynb` — exploratory data analysis (Phase 3)
 - `ml/evaluation/metrics_report.md` — model training metrics (added Phase 5)
 - `ml/models/*/model_card.md` — per-model documentation (added Phase 5)
