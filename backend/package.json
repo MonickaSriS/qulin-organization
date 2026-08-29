@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "jest --watchAll=false",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest --watchAll=false",
     "seed": "node scripts/seed-db.js"
   },
   "keywords": [],
