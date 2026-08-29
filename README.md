@@ -22,7 +22,9 @@ An AI-powered food waste prevention system for restaurants, cafeterias, hotels, 
 - [x] **Phase 2** — Data Model & API Contract Design
 - [x] **Phase 3** — Dataset Preparation
 - [x] **Phase 4** — Backend Core (Auth, Org, Inventory)
-- [ ] **Phase 5** — ML Model Development
+- [~] **Phase 5** — ML Model Development *(in progress)*
+  - [x] Member 1 — Production/Consumption/Waste CRUD
+  - [ ] Member 2 — Demand + Waste-Risk model training
 - [ ] **Phase 6** — FastAPI Serving Layer
 - [ ] **Phase 7** — Frontend: Operations Module
 - [ ] **Phase 8** — Frontend: Dashboard Module
@@ -58,20 +60,21 @@ qulin-organization/
 │   ├── scripts/
 │   │   └── seed-db.js               # synthetic data seeder — Member 1
 │   ├── src/
-│   │   ├── config/                   # db connection, env loader
+│   │   ├── config/                   # db.js (Mongo connection)
 │   │   ├── models/                    # Organization, Branch, User, Ingredient,
 │   │   │                              #   Production, Consumption, Waste
-│   │   ├── routes/                    # auth.routes.js, inventory.routes.js
-│   │   ├── controllers/               # auth.controller.js, inventory.controller.js
+│   │   ├── routes/                    # auth, inventory, production, consumption, waste
+│   │   ├── controllers/               # auth, inventory, production, consumption, waste
 │   │   ├── middleware/                # auth.js (JWT verify), errorHandler.js
-│   │   ├── validators/                # auth.validator.js, inventory.validator.js (Zod)
+│   │   ├── validators/                # auth, inventory, production, consumption, waste (Zod)
 │   │   ├── utils/                      # AppError.js, asyncHandler.js
 │   │   ├── services/                   # (added Phase 6 — aiClient.js)
 │   │   ├── app.js
 │   │   └── server.js
 │   ├── tests/
 │   │   ├── auth.test.js
-│   │   └── inventory.test.js
+│   │   ├── inventory.test.js
+│   │   └── ops.test.js               # production, consumption, waste
 │   ├── package.json
 │   └── .env.example
 │
@@ -93,10 +96,10 @@ qulin-organization/
 │   │       └── dataset.csv                 # flattened synthetic dataset (150 days)
 │   ├── notebooks/
 │   │   └── eda.ipynb                        # seasonality + waste correlation analysis
-│   ├── preprocessing/                       # (added Phase 5)
-│   ├── training/                            # (added Phase 5)
-│   ├── evaluation/                          # (added Phase 5)
-│   └── models/                              # trained .pkl files (added Phase 5)
+│   ├── preprocessing/                       # (in progress — Phase 5, Member 2)
+│   ├── training/                            # (in progress — Phase 5, Member 2)
+│   ├── evaluation/                          # (in progress — Phase 5, Member 2)
+│   └── models/                              # trained .pkl files (in progress — Phase 5, Member 2)
 │
 ├── frontend/            # React app (added Phase 7-8) — shared, split by module
 ├── docs/
@@ -117,7 +120,12 @@ qulin-organization/
 - A MongoDB Atlas free-tier cluster (or local MongoDB instance)
 - [Postman](https://www.postman.com/) (recommended for manual API testing)
 
-> **Windows DNS note:** if MongoDB connections fail with `ECONNREFUSED` / `querySrv` errors, your network's default DNS resolver may not support the SRV record lookups Atlas's `mongodb+srv://` format relies on. Fix: set your network adapter's DNS to `8.8.8.8` / `8.8.4.4` (Google DNS), then `ipconfig /flushdns` and retry.
+> **Windows DNS note:** if MongoDB connections fail with `ECONNREFUSED` / `querySrv` errors — in the running server *or* in test runs — your network's default DNS resolver may not support the SRV record lookups Atlas's `mongodb+srv://` format relies on.
+> 1. Set your network adapter's DNS to `8.8.8.8` / `8.8.4.4` (Google DNS), then `ipconfig /flushdns`.
+> 2. This setting can silently revert after reconnecting to Wi-Fi or switching networks — re-check it if the error reappears.
+> 3. Verify with: `nslookup -type=SRV _mongodb._tcp.<your-cluster-host>`
+>
+> Additionally, if the error only appears under `npm run test` (not `npm run dev`), it's likely Jest running multiple test files in parallel workers, each opening a simultaneous SRV lookup. Fixed here by running Jest with `--runInBand` (serial execution) and raising `serverSelectionTimeoutMS`/`testTimeout` — see `backend/jest.config.js` and `backend/src/config/db.js`.
 
 ### 1. Clone the repository
 
@@ -160,7 +168,7 @@ curl localhost:5000/health
 # Expected: {"status":"ok","service":"qulin-backend"}
 ```
 
-Run the automated test suite:
+Run the automated test suite (runs serially — see DNS note above for why):
 
 ```bash
 npm run test
@@ -220,7 +228,7 @@ Open `ml/notebooks/eda.ipynb` in VS Code (select the `ai-service/.venv` kernel) 
 
 ---
 
-## API Endpoints (live as of Phase 4)
+## API Endpoints (live as of Phase 5)
 
 All under `http://localhost:5000/api/v1`. Full contract in `docs/api-contract.md`.
 
@@ -232,22 +240,28 @@ All under `http://localhost:5000/api/v1`. Full contract in `docs/api-contract.md
 | `/inventory` | POST | JWT | Create ingredient |
 | `/inventory/:id` | PUT | JWT | Update ingredient |
 | `/inventory/:id` | DELETE | JWT | Delete ingredient |
+| `/production` | GET | JWT | Filter by `branchId`, `date`, `meal` |
+| `/production` | POST | JWT | Log prepared quantity |
+| `/consumption` | GET | JWT | Filter by `branchId`, `date`, `meal` |
+| `/consumption` | POST | JWT | Log consumed quantity + customer count |
+| `/waste` | GET | JWT | Filter by `branchId`, `date` |
+| `/waste` | POST | JWT | Log wasted quantity + reason |
+
+> Production/Consumption/Waste are append-only logs (GET + POST only) per the frozen contract — no PUT/DELETE. If correction of mis-entered logs becomes a real requirement, that's a scoped contract-change PR, not an ad-hoc addition.
 
 ### Testing the API manually
 
 A Postman collection (`QULIN_API`) is the recommended way to exercise these endpoints during development:
 
-1. Create a collection with variable `baseUrl` = `http://localhost:5000/api/v1`
-2. On the `register` and `login` requests, add this to **Scripts → Post-response** so the JWT auto-saves for reuse:
+1. Collection variable `baseUrl` = `http://localhost:5000/api/v1`
+2. On `register`/`login` requests, add to **Scripts → Post-response**:
    ```javascript
    const data = pm.response.json();
    if (data.token) {
      pm.collectionVariables.set("token", data.token);
    }
    ```
-3. On authenticated requests (inventory), set header `Authorization: Bearer {{token}}`
-
-`curl` equivalents are also documented inline in each controller's PR description for quick smoke-testing without Postman.
+3. On authenticated requests, set header `Authorization: Bearer {{token}}`
 
 ---
 
@@ -299,12 +313,18 @@ Two more (`Recommendation`, `Outcome`) are documented in the contract and will b
 
 ---
 
+## Known Issues / Troubleshooting Log
+
+- **MongoDB SRV DNS resolution on Windows:** see the Windows DNS note under Local Setup. Root cause: some ISP/router DNS resolvers don't properly handle the SRV record queries `mongodb+srv://` depends on. Fixed via manual DNS (`8.8.8.8`/`8.8.4.4`) + `--runInBand` for Jest + extended connection timeouts. Recurs if the network changes — re-check DNS settings first if this error reappears.
+
+---
+
 ## Documentation
 
 - `docs/api-contract.md` — frozen API contract (Phase 2)
 - `ml/notebooks/eda.ipynb` — exploratory data analysis (Phase 3)
-- `ml/evaluation/metrics_report.md` — model training metrics (added Phase 5)
-- `ml/models/*/model_card.md` — per-model documentation (added Phase 5)
+- `ml/evaluation/metrics_report.md` — model training metrics (added Phase 5, Member 2 — pending)
+- `ml/models/*/model_card.md` — per-model documentation (added Phase 5, Member 2 — pending)
 
 ---
 
