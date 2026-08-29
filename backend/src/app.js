@@ -3,6 +3,9 @@ import cors from 'cors';
 import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.routes.js';
 import inventoryRoutes from './routes/inventory.routes.js';
+import productionRoutes from './routes/production.routes.js';
+import consumptionRoutes from './routes/consumption.routes.js';
+import wasteRoutes from './routes/waste.routes.js';
 
 const app = express();
 
@@ -15,11 +18,11 @@ app.get('/health', (req, res) => {
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/inventory', inventoryRoutes);
+app.use('/api/v1/production', productionRoutes);
+app.use('/api/v1/consumption', consumptionRoutes);
+app.use('/api/v1/waste', wasteRoutes);
 
-// Future route mounts (Phase 5 onward):
-// app.use('/api/v1/production', productionRoutes);
-// app.use('/api/v1/consumption', consumptionRoutes);
-// app.use('/api/v1/waste', wasteRoutes);
+// Future route mounts (Phase 6+):
 // app.use('/api/v1/ai', aiRoutes);
 // app.use('/api/v1/outcomes', outcomeRoutes);
 
