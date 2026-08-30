@@ -1,0 +1,11 @@
+{
+  "demand": { "item": "Rice", "expectedDemand": 428.5 },
+  "wasteRisk": { "item": "Rice", "riskScore": 82.0, "band": "red" },
+  "recommend": {
+    "item": "Rice",
+    "cause": "overproduction",
+    "evidence": "Rice preparation remained roughly constant (+0%) while customer demand decreased (-15%).",
+    "recommendation": "Reduce Rice preparation by approximately 15%.",
+    "suggestedQty": null
+  }
+}

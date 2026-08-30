@@ -1,9 +1,7 @@
+import "./env.js"; // MUST be the first import — loads .env before anything else evaluates
 import dns from "dns";
 
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
-
-import dotenv from "dotenv";
-dotenv.config();
 
 import app from "./app.js";
 import { connectDB } from "./config/db.js";
